@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Game of Sarvjeet | Ninja Sky Jump 3D</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#79d8ff;font-family:Arial,Helvetica,sans-serif;touch-action:none}
+#game{position:fixed;inset:0}canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;top:9px;left:9px;right:9px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;color:#fff;text-shadow:0 2px 4px #001;pointer-events:none}
+.hudcol{display:flex;flex-direction:column;gap:6px}.pill{background:#101a32dd;border:1px solid #ffffff55;border-radius:12px;padding:7px 9px;font-size:13px;font-weight:bold}
+#pause{pointer-events:auto;border:0;border-radius:12px;background:#101a32e8;color:#fff;padding:9px 13px;font-size:18px;font-weight:bold}
+.health{height:10px;width:140px;border-radius:20px;background:#63263b;overflow:hidden;margin-top:5px;border:1px solid #ffffff66}.healthin{height:100%;width:100%;background:#42f27b}
+#controls{position:fixed;bottom:15px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;padding:0 12px;gap:8px;pointer-events:none}
+.pad,.actions{display:flex;gap:8px;align-items:flex-end}.ctrl{pointer-events:auto;width:56px;height:58px;border-radius:16px;border:1px solid #ffffff88;background:#10213d99;color:#fff;font-size:24px;font-weight:bold;box-shadow:0 4px 12px #0003;touch-action:none}
+.action{pointer-events:auto;width:58px;height:62px;border-radius:18px;border:1px solid #ffffff99;color:white;font-size:11px;font-weight:bold;background:#e3445c;touch-action:none}.action.jet{background:#8a4de8}.action.jump{background:#ee923c}
+#hint{position:fixed;bottom:88px;left:0;right:0;text-align:center;color:white;text-shadow:0 2px 4px #001;font-size:11px;font-weight:bold;pointer-events:none}
+#panel{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;background:linear-gradient(140deg,#08142be8,#111b43df 55%,#1e2766dd);color:#fff;text-align:center;overflow:auto;z-index:5}
+.card{width:min(100%,430px);max-height:96vh;overflow:auto;border:1px solid #ffffff44;border-radius:23px;padding:20px 18px;background:linear-gradient(160deg,#17294bf5,#10172df7);box-shadow:0 18px 55px #0008}
+.logo{font-size:clamp(29px,7vw,40px);font-weight:900;line-height:1.05;color:#58f4ff;text-shadow:0 0 18px #00bfff88;margin:0 0 10px}
+.welcome{font-size:clamp(20px,5.3vw,27px);font-weight:900;margin:12px 0}.small{font-size:13px;color:#cbd7f3;line-height:1.5}
+.stats{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin:13px 0}.stat{background:#ffffff10;border:1px solid #ffffff22;border-radius:12px;padding:8px 10px;font-size:13px}
+.menuBtn{display:block;width:100%;border:0;border-radius:13px;padding:12px 10px;margin:8px 0;background:linear-gradient(90deg,#32d9f4,#55a8ff);color:#07152a;font-weight:900;font-size:15px}
+.menuBtn.alt{background:#29385c;color:#fff;border:1px solid #ffffff22}.menuBtn:active,.ctrl:active,.action:active{filter:brightness(1.25);transform:scale(.98)}
+#notice{min-height:18px;font-size:12px;color:#8fffd8;margin-top:6px}.hidden{display:none!important}
+@media(min-width:700px){.ctrl{width:68px;height:68px}.action{width:70px;height:70px}.pill{font-size:15px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud" class="hidden">
+ <div class="hudcol">
+  <div class="pill">🏆 Score: <span id="score">0</span></div>
+  <div class="pill">🪙 <span id="coins">0</span> &nbsp; 💎 <span id="gems">0</span></div>
+  <div class="pill">❤️ <span id="lives">3</span><div class="health"><div class="healthin" id="healthbar"></div></div></div>
+ </div>
+ <div class="hudcol" style="align-items:flex-end"><div class="pill">⭐ Best: <span id="best">0</span></div><button id="pause">Ⅱ</button></div>
+</div>
+<div id="hint" class="hidden">◀ ▶ MOVE · JUMP TWICE · ⚔ SWORD · 🚀 JETPACK</div>
+<div id="controls" class="hidden">
+ <div class="pad"><button class="ctrl" id="left">◀</button><button class="ctrl" id="right">▶</button></div>
+ <div class="actions"><button class="action" id="sword">⚔<br>SWORD</button><button class="action jet" id="jet">🚀<br>JETPACK</button><button class="action jump" id="jump">⬆<br>JUMP</button></div>
+</div>
+<div id="panel"><div class="card" id="card"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const panel=$('panel'), card=$('card');
+const worlds=[
+ {name:'Sky Kingdom',icon:'☁️',bg:0x79d8ff,platform:0x287dbd,top:0x58e6e0},
+ {name:'Sunset World',icon:'🌅',bg:0xffa36d,platform:0x874f8c,top:0xffd26b},
+ {name:'Moon Night',icon:'🌙',bg:0x171d4c,platform:0x39477d,top:0x69c8ff}
+];
+const skins=[
+ {name:'Shadow Ninja',icon:'🥷',body:0x20263b,scarf:0xff3558,cost:0},
+ {name:'Emerald Ninja',icon:'🍀',body:0x126b53,scarf:0x54ff9d,cost:30},
+ {name:'Golden Ninja',icon:'👑',body:0x9b6715,scarf:0xffd23d,cost:70},
+ {name:'Ice Ninja',icon:'❄️',body:0x7cb8d9,scarf:0xefffff,cost:120}
+];
+let worldIndex=0, skinIndex=0;
+let coins=Number(localStorage.getItem('sarvCoins')||0),gems=Number(localStorage.getItem('sarvGems')||0),best=Number(localStorage.getItem('sarvBest')||0);
+let THREEOK=false,renderer,scene,camera,ninja,nParts={},swordObj;
+let mats={},platforms=[],pickups=[],enemies=[],clouds=[];
+let running=false,paused=true,gameOver=false;
+let moveL=false,moveR=false,jumpQueued=false,swordQueued=false,jetQueued=false;
+let score=0,lives=3,health=100,jetFuel=100,jetTimer=0,attackTimer=0,cameraY=4,lastTime=0;
+const spacing=2.6;
+const st={x:0,y:1,z:0,vx:0,vy:0,grounded:true,jumps:0,highest:0,checkpoint:0,invuln:0};
+function setPanel(html){card.innerHTML=html;panel.classList.remove('hidden');}
+function hidePanel(){panel.classList.add('hidden');}
+function updateMenuStats(){const el=$('menuStats');if(el)el.innerHTML=`<div class="stat">🪙 Coins: <b>${coins}</b></div><div class="stat">💎 Gems: <b>${gems}</b></div><div class="stat">⭐ Best: <b>${best}</b></div>`;}
+function mainMenu(){
+ paused=true;
+ $('hud').classList.add('hidden');$('controls').classList.add('hidden');$('hint').classList.add('hidden');
+ setPanel(`<div class="logo">NINJA SKY<br>JUMP 3D</div><div class="welcome">WELCOME TO GAME<br>OF SARVJEET</div><p class="small">Jump across sky platforms, collect treasure, defeat enemies and challenge the boss!</p><div class="stats" id="menuStats"></div><button class="menuBtn" data-action="play">▶ PLAY GAME</button><button class="menuBtn alt" data-action="worlds">🌍 SELECT WORLD</button><button class="menuBtn alt" data-action="shop">🛍️ NINJA SHOP</button><button class="menuBtn alt" data-action="how">📘 HOW TO PLAY</button><div id="notice"></div>`);
+ updateMenuStats();
+}
+function worldMenu(){
+ setPanel(`<div class="logo">🌍 SELECT WORLD</div><p class="small">Choose your map.</p>${worlds.map((w,i)=>`<button class="menuBtn ${i===worldIndex?'':'alt'}" data-world="${i}">${w.icon} ${w.name}${i===worldIndex?' ✓':''}</button>`).join('')}<button class="menuBtn alt" data-action="home">⌂ MAIN MENU</button>`);
+}
+function shopMenu(){
+ setPanel(`<div class="logo">🛍️ NINJA SHOP</div><div class="stats"><div class="stat">🪙 ${coins} coins</div><div class="stat">💎 ${gems} gems</div></div><p class="small">Choose your ninja skin. Purchases stay saved on this device.</p>${skins.map((s,i)=>{let owned=i===0||localStorage.getItem('sarvSkin'+i)==='yes';return `<button class="menuBtn ${i===skinIndex?'':'alt'}" data-skin="${i}">${s.icon} ${s.name} · ${owned?'OWNED':s.cost+' coins'}${i===skinIndex?' ✓':''}</button>`}).join('')}<button class="menuBtn alt" data-action="home">⌂ MAIN MENU</button><div id="notice"></div>`);
+}
+function howMenu(){
+ setPanel(`<div class="logo">📘 HOW TO PLAY</div><p class="small" style="text-align:left">◀ ▶ <b>Move:</b> Hold left or right<br><br>⬆ <b>Jump:</b> Tap twice for double jump<br><br>⚔ <b>Sword:</b> Attack nearby enemies and the boss<br><br>🚀 <b>Jetpack:</b> Use a boost after collecting a power-up<br><br>🪙 <b>Coins:</b> Unlock ninja skins in the shop<br><br>💎 <b>Gems:</b> Collect for bonus points<br><br>🟨 <b>Gold platforms:</b> Checkpoints. Avoid enemies and don't fall!</p><button class="menuBtn alt" data-action="home">⌂ MAIN MENU</button>`);
+}
+function pauseMenu(){
+ paused=true;
+ setPanel(`<div class="logo">⏸ PAUSED</div><p class="small">Take a break, ninja.</p><button class="menuBtn" data-action="resume">▶ RESUME</button><button class="menuBtn alt" data-action="home">⌂ MAIN MENU</button>`);
+}
+function endMenu(title='GAME OVER'){
+ gameOver=true;paused=true;
+ setPanel(`<div class="logo">${title}</div><p class="small">Score: <b>${score}</b><br>Coins: <b>${coins}</b> · Gems: <b>${gems}</b></p><button class="menuBtn" data-action="play">↻ PLAY AGAIN</button><button class="menuBtn alt" data-action="home">⌂ MAIN MENU</button>`);
+}
+function showNotice(msg){const n=$('notice');if(n)n.textContent=msg;}
+function setup3D(){
+ if(!window.THREE){setPanel(`<div class="logo">3D ENGINE NOT LOADED</div><p class="small">Internet is required to load Three.js. Turn on internet, then refresh this page.</p><button class="menuBtn" data-action="home">RETRY / MAIN MENU</button>`);return false;}
+ THREEOK=true;
+ scene=new THREE.Scene();scene.background=new THREE.Color(worlds[worldIndex].bg);scene.fog=new THREE.Fog(worlds[worldIndex].bg,30,100);
+ camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,180);camera.position.set(0,8,11);
+ renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.35));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=false;
+ $('game').appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0xe6f9ff,0x344263,2.1));
+ const sun=new THREE.DirectionalLight(0xffffff,1.8);sun.position.set(-5,13,8);scene.add(sun);
+ mats.platform=new THREE.MeshStandardMaterial({color:worlds[worldIndex].platform,roughness:.8});
+ mats.top=new THREE.MeshStandardMaterial({color:worlds[worldIndex].top,roughness:.6});
+ mats.dark=new THREE.MeshStandardMaterial({color:0x182038});mats.red=new THREE.MeshStandardMaterial({color:0xff3558});
+ mats.skin=new THREE.MeshStandardMaterial({color:0xffc49b});mats.gold=new THREE.MeshStandardMaterial({color:0xffc928,metalness:.35,roughness:.3});
+ mats.gem=new THREE.MeshStandardMaterial({color:0x39eaff,emissive:0x087caa,emissiveIntensity:.6});
+ mats.power=new THREE.MeshStandardMaterial({color:0xb85aff,emissive:0x6e19bb,emissiveIntensity:.5});
+ mats.enemy=new THREE.MeshStandardMaterial({color:0x9d2850});mats.boss=new THREE.MeshStandardMaterial({color:0x542778});
+ mats.sword=new THREE.MeshStandardMaterial({color:0xc7f7ff,metalness:.7,roughness:.2});
+ for(let i=0;i<16;i++)makeCloud((Math.random()-.5)*24,Math.random()*48-3,-8-Math.random()*12,.55+Math.random()*.6);
+ return true;
+}
+function box(parent,size,mat,pos){const m=new THREE.Mesh(new THREE.BoxGeometry(size[0],size[1],size[2]),mat);m.position.set(pos[0],pos[1],pos[2]);parent.add(m);return m;}
+function makeCloud(x,y,z,s){const g=new THREE.Group(),m=new THREE.MeshBasicMaterial({color:0xffffff});for(let i=0;i<4;i++){let p=new THREE.Mesh(new THREE.SphereGeometry(.6*s,7,6),m);p.position.set((i-1.5)*.55*s,Math.sin(i*1.6)*.12*s,0);p.scale.y=.55;g.add(p)}g.position.set(x,y,z);scene.add(g);clouds.push(g);}
+function makeNinja(){
+ ninja=new THREE.Group();
+ const bodyMat=new THREE.MeshStandardMaterial({color:skins[skinIndex].body}),scarfMat=new THREE.MeshStandardMaterial({color:skins[skinIndex].scarf});
+ nParts.body=box(ninja,[.62,.78,.38],bodyMat,[0,0,0]);
+ box(ninja,[.65,.13,.41],mats.red,[0,-.18,0]);
+ box(ninja,[.54,.53,.5],mats.skin,[0,.61,0]);
+ box(ninja,[.56,.2,.53],mats.dark,[0,.49,.02]);
+ box(ninja,[.58,.12,.54],scarfMat,[0,.82,0]);
+ const white=new THREE.MeshBasicMaterial({color:0xffffff});
+ box(ninja,[.11,.045,.025],white,[-.13,.57,.282]);box(ninja,[.11,.045,.025],white,[.13,.57,.282]);
+ nParts.armL=box(ninja,[.2,.55,.24],bodyMat,[-.43,-.02,0]);nParts.armR=box(ninja,[.2,.55,.24],bodyMat,[.43,-.02,0]);
+ nParts.legL=box(ninja,[.24,.48,.28],mats.dark,[-.17,-.59,0]);nParts.legR=box(ninja,[.24,.48,.28],mats.dark,[.17,-.59,0]);
+ box(ninja,[.22,.17,.66],scarfMat,[0,.17,-.43]);
+ swordObj=new THREE.Group();box(swordObj,[.08,.7,.1],mats.sword,[0,.25,0]);box(swordObj,[.3,.09,.14],mats.gold,[0,-.1,0]);swordObj.position.set(.57,-.02,.12);swordObj.visible=false;ninja.add(swordObj);
+ ninja.position.set(st.x,st.y+.75,st.z);scene.add(ninja);
+}
+function clearWorld(){for(const a of platforms)scene.remove(a);for(const a of pickups)scene.remove(a.obj);for(const a of enemies)scene.remove(a.obj);platforms=[];pickups=[];enemies=[];}
+function addPickup(p){
+ const d=p.userData,r=Math.random(),type=r<.62?'coin':r<.87?'gem':'jet';
+ const geo=type==='coin'?new THREE.TorusGeometry(.22,.07,7,14):type==='gem'?new THREE.OctahedronGeometry(.25):new THREE.IcosahedronGeometry(.26,0);
+ const mat=type==='coin'?mats.gold:type==='gem'?mats.gem:mats.power;
+ const obj=new THREE.Mesh(geo,mat);obj.position.set(d.x+(Math.random()-.5)*d.w*.4,d.y+.9,d.z+(Math.random()-.5)*d.d*.3);scene.add(obj);pickups.push({obj,type,baseY:obj.position.y,alive:true});
+}
+function addPlatform(x,y,z,w=3,d=2.8,checkpoint=false){
+ const g=new THREE.Group(),base=new THREE.Mesh(new THREE.BoxGeometry(w,.35,d),checkpoint?mats.gold:mats.platform),cap=new THREE.Mesh(new THREE.BoxGeometry(w-.12,.08,d-.12),checkpoint?mats.gold:mats.top);
+ cap.position.y=.2;g.add(base,cap);g.position.set(x,y,z);g.userData={x,y,z,w,d,checkpoint};scene.add(g);platforms.push(g);if(Math.random()<.78)addPickup(g);return g;
+}
+function addEnemy(x,y,z,big=false){
+ const g=new THREE.Group(),mat=big?mats.boss:mats.enemy,s=big?1.6:1;
+ box(g,[.7*s,.95*s,.55*s],mat,[0,0,0]);box(g,[.78*s,.17*s,.58*s],mats.red,[0,.34*s,.02]);
+ const eye=new THREE.MeshBasicMaterial({color:0xffe56b});box(g,[.12*s,.08*s,.03],eye,[-.16*s,.12*s,.29*s]);box(g,[.12*s,.08*s,.03],eye,[.16*s,.12*s,.29*s]);
+ g.position.set(x,y,z);scene.add(g);enemies.push({obj:g,hp:big?8:2,big,alive:true,baseX:x,phase:Math.random()*5});}
+function spawnPlatform(index){
+ const y=index*spacing;let prev=platforms[0];for(const p of platforms)if(p.position.y>prev.position.y)prev=p;
+ let x=(Math.random()-.5)*5.2;x=THREE.MathUtils.clamp(x,prev.position.x-2.4,prev.position.x+2.4);x=THREE.MathUtils.clamp(x,-4,4);
+ const p=addPlatform(x,y,(Math.random()-.5)*1.3,3,2.8,index%5===0);
+ if(index>3&&index%3===0)addEnemy(x+(Math.random()-.5)*1.1,y+1,p.position.z+.2,false);
+ if(index===15)addEnemy(x,y+1.3,p.position.z,true);
+}
+function setWorld(){if(!scene)return;scene.background.setHex(worlds[worldIndex].bg);scene.fog.color.setHex(worlds[worldIndex].bg);mats.platform.color.setHex(worlds[worldIndex].platform);mats.top.color.setHex(worlds[worldIndex].top);}
+function updateHUD(){
+ $('score').textContent=score;$('coins').textContent=coins;$('gems').textContent=gems;$('best').textContent=best;$('lives').textContent=lives;
+ $('healthbar').style.width=Math.max(0,health)+'%';$('healthbar').style.background=health<35?'#ff385b':'#42f27b';
+ localStorage.setItem('sarvCoins',coins);localStorage.setItem('sarvGems',gems);
+}
+function beginGame(){
+ if(!THREEOK){if(!setup3D())return;}
+ clearWorld();setWorld();score=0;lives=3;health=100;jetFuel=100;jetTimer=0;attackTimer=0;
+ Object.assign(st,{x:0,y:1,z:0,vx:0,vy:0,grounded:true,jumps:0,highest:0,checkpoint:0,invuln:0});
+ addPlatform(0,0,0,4.2,3.5,false);for(let i=1;i<=18;i++)spawnPlatform(i);
+ makeNinja();running=true;paused=false;gameOver=false;
+ $('hud').classList.remove('hidden');$('controls').classList.remove('hidden');$('hint').classList.remove('hidden');hidePanel();lastTime=performance.now();updateHUD();
+}
+function hidePanel(){panel.classList.add('hidden');}
+function attack(){
+ if(paused||!ninja)return;attackTimer=.3;swordObj.visible=true;
+ for(const e of enemies){if(!e.alive)continue;const dx=e.obj.position.x-st.x,dy=e.obj.position.y-(st.y+.7),dz=e.obj.position.z-st.z;
+  if(Math.abs(dx)<1.65&&Math.abs(dy)<1.8&&Math.abs(dz)<1.6){e.hp--;e.obj.position.x+=Math.sign(dx||1)*.25;if(e.hp<=0){e.alive=false;scene.remove(e.obj);coins+=e.big?20:5;if(e.big){updateHUD();endMenu('🏆 BOSS DEFEATED!');return}}}}
+ updateHUD();
+}
+function jump(){if(paused||gameOver)return;if(st.grounded){st.vy=11.5;st.grounded=false;st.jumps=1}else if(st.jumps<2){st.vy=10.2;st.jumps++;}}
+function jetpack(){if(paused||jetFuel<=0)return;jetFuel=Math.max(0,jetFuel-35);jetTimer=.75;st.vy=Math.max(st.vy,13.5);st.grounded=false;st.jumps=2;}
+function update(dt,now){
+ if(paused||!ninja)return;
+ if(jumpQueued){jump();jumpQueued=false}if(swordQueued){attack();swordQueued=false}if(jetQueued){jetpack();jetQueued=false}
+ const dir=(moveR?1:0)-(moveL?1:0);
+ st.vx+=dir*22*dt;st.vx*=Math.pow(.05,dt);st.vx=THREE.MathUtils.clamp(st.vx,-7,7);st.x=THREE.MathUtils.clamp(st.x+st.vx*dt,-5.2,5.2);
+ const oldY=st.y;st.vy-=15*dt;if(jetTimer>0){st.vy+=22*dt;jetTimer-=dt}st.y+=st.vy*dt;
+ if(st.vy<=0){for(const p of platforms){const d=p.userData,top=d.y+.24;if(oldY>=top-.04&&st.y<=top+.04&&Math.abs(st.x-d.x)<d.w/2+.2&&Math.abs(st.z-d.z)<d.d/2+.2){st.y=top;st.vy=11.5;st.grounded=true;st.jumps=0;if(d.checkpoint)st.checkpoint=Math.max(st.checkpoint,d.y);break}}}
+ if(st.y<oldY-.001)st.grounded=false;
+ st.highest=Math.max(st.highest,st.y);score=Math.max(score,Math.floor(st.highest*10)+gems*2);if(score>best){best=score;localStorage.setItem('sarvBest',best)}
+ if(st.invuln>0)st.invuln-=dt;
+ for(const p of pickups){if(!p.alive)continue;p.obj.rotation.y+=dt*2.5;p.obj.position.y=p.baseY+Math.sin(now*.003+p.baseY)*.12;
+  if(Math.abs(st.x-p.obj.position.x)<.7&&Math.abs(st.y+.1-p.obj.position.y)<.9&&Math.abs(st.z-p.obj.position.z)<.8){p.alive=false;scene.remove(p.obj);if(p.type==='coin')coins++;else if(p.type==='gem'){gems++;score+=25}else{jetFuel=100;jetTimer=.5;st.vy=Math.max(st.vy,13)}}}
+ for(const e of enemies){if(!e.alive)continue;e.phase+=dt*1.7;e.obj.position.x=e.baseX+Math.sin(e.phase)*.65;
+  if(Math.abs(st.x-e.obj.position.x)<.62&&Math.abs(st.y+.3-e.obj.position.y)<.95&&Math.abs(st.z-e.obj.position.z)<.8&&st.invuln<=0){health-=25;st.invuln=1;st.vy=7;if(health<=0){lives--;health=100;if(lives<=0){updateHUD();endMenu();return}else{st.x=0;st.y=st.checkpoint+1.4;st.vy=0}}}}
+ if(attackTimer>0){attackTimer-=dt;if(attackTimer<=0)swordObj.visible=false;swordObj.rotation.z=-.7}
+ const target=Math.max(4,st.y+3.5);camera.position.x+=(st.x*.35-camera.position.x)*Math.min(1,dt*2.5);camera.position.y+=(target+4-camera.position.y)*Math.min(1,dt*3);camera.position.z=11;camera.lookAt(st.x*.35,target,0);
+ ninja.position.set(st.x,st.y+.75,st.z);ninja.rotation.z=-st.vx*.045;
+ const run=Math.sin(now*.016)*.13;nParts.armL.rotation.x=dir?run:0;nParts.armR.rotation.x=dir?-run:0;nParts.legL.rotation.x=dir?-run:0;nParts.legR.rotation.x=dir?run:0;
+ let maxY=0;for(const p of platforms)maxY=Math.max(maxY,p.position.y);while(maxY<st.y+22){spawnPlatform(Math.floor(maxY/spacing)+1);maxY=0;for(const p of platforms)maxY=Math.max(maxY,p.position.y)}
+ for(let i=platforms.length-1;i>=0;i--)if(platforms[i].position.y<st.y-14){scene.remove(platforms[i]);platforms.splice(i,1)}
+ for(let i=pickups.length-1;i>=0;i--)if(pickups[i].baseY<st.y-14){scene.remove(pickups[i].obj);pickups.splice(i,1)}
+ if(st.y<st.checkpoint-8&&st.checkpoint>0){st.y=st.checkpoint+1.4;st.x=0;st.vy=0;st.vx=0}
+ else if(st.y<-8){lives--;if(lives>0){st.x=0;st.y=st.checkpoint+1.4;st.vy=0;health=100}else{updateHUD();endMenu();return}}
+ updateHUD();
+}
+function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-lastTime)/1000||0,.035);lastTime=now;if(running&&THREEOK){update(dt,now);for(const c of clouds)c.position.x+=Math.sin(now*.0002+c.position.y)*dt*.12;renderer.render(scene,camera)}}
+function bindHold(id,callback){const el=$(id);el.addEventListener('pointerdown',e=>{e.preventDefault();el.setPointerCapture?.(e.pointerId);callback(true)});const release=e=>{e.preventDefault();callback(false)};el.addEventListener('pointerup',release);el.addEventListener('pointercancel',release);el.addEventListener('lostpointercapture',release);}
+bindHold('left',v=>moveL=v);bindHold('right',v=>moveR=v);
+$('jump').addEventListener('pointerdown',e=>{e.preventDefault();jumpQueued=true});
+$('sword').addEventListener('pointerdown',e=>{e.preventDefault();swordQueued=true});
+$('jet').addEventListener('pointerdown',e=>{e.preventDefault();jetQueued=true});
+$('pause').addEventListener('click',pauseMenu);
+panel.addEventListener('click',function(e){
+ const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.action){
+  const a=b.dataset.action;
+  if(a==='play'){beginGame();return}if(a==='worlds'){worldMenu();return}if(a==='shop'){shopMenu();return}if(a==='how'){howMenu();return}
+  if(a==='home'){mainMenu();return}if(a==='resume'){paused=false;hidePanel();lastTime=performance.now();return}
+ }
+ if(b.dataset.world!==undefined){worldIndex=Number(b.dataset.world);setWorld();worldMenu();return}
+ if(b.dataset.skin!==undefined){
+  const i=Number(b.dataset.skin),s=skins[i],owned=i===0||localStorage.getItem('sarvSkin'+i)==='yes';
+  if(owned){skinIndex=i;shopMenu()}else if(coins>=s.cost){coins-=s.cost;localStorage.setItem('sarvSkin'+i,'yes');skinIndex=i;shopMenu()}else showNotice('Not enough coins. Play the game to collect more!');return;
+ }
+});
+window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft'||e.key==='a')moveL=true;if(e.key==='ArrowRight'||e.key==='d')moveR=true;if(e.key===' '||e.key==='ArrowUp')jumpQueued=true;if(e.key==='x')swordQueued=true;if(e.key==='j')jetQueued=true});
+window.addEventListener('keyup',e=>{if(e.key==='ArrowLeft'||e.key==='a')moveL=false;if(e.key==='ArrowRight'||e.key==='d')moveR=false});
+window.addEventListener('resize',()=>{if(camera&&renderer){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}});
+mainMenu();
+if(window.THREE){setup3D();setWorld();}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
